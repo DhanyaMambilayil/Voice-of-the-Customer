@@ -38,6 +38,7 @@
     --font-body:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono:'Inter', -apple-system, sans-serif;
     --track:#E2E6ED;
+    --gold-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 1.8c1 0 1.8.8 1.8 1.8v6.6c.3-.1.6-.2 1-.2.9 0 1.7.6 1.9 1.5.3-.1.6-.2 1-.2 1 0 1.9.7 2.1 1.7.2-.1.5-.1.7-.1 1.1 0 2 .9 2 2v3.4c0 3-2.4 5.4-5.4 5.4h-2.1c-1.8 0-3.5-.9-4.5-2.4l-3-4.4c-.5-.8-.3-1.9.5-2.4.7-.5 1.7-.4 2.3.2l1.1 1.1V3.6c0-1 .8-1.8 1.8-1.8z'fill='%23E8A33D' stroke='%230A1F44' stroke-width='0.9' stroke-linejoin='round' stroke-linecap='round'/%3E%3Cline x1='11.3' y1='10.5' x2='11.3' y2='14.2' stroke='%230A1F44' stroke-width='0.6'/%3E%3Cline x1='14.2' y1='11.6' x2='14.2' y2='14.8' stroke='%230A1F44' stroke-width='0.6'/%3E%3Cline x1='17.1' y1='12.9' x2='17.1' y2='15.4' stroke='%230A1F44' stroke-width='0.6'/%3E%3C/svg%3E") 3 2, pointer;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--page);color:var(--ink);font-family:var(--font-body);}
@@ -62,7 +63,7 @@
   .brand-toggle{display:flex;gap:6px;}
   .brand-toggle button{
     font-family:var(--font-display);font-size:13px;letter-spacing:0.2px;
-    background:#fff;color:var(--ink-soft);border:1px solid var(--line);padding:9px 18px;border-radius:999px;cursor:pointer;
+    background:#fff;color:var(--ink-soft);border:1px solid var(--line);padding:9px 18px;border-radius:999px;cursor:var(--gold-cursor);
     font-weight:600;transition:all .15s ease;
   }
   .brand-toggle button.active{background:var(--green);color:#fff;border-color:var(--green);box-shadow:none;}
@@ -103,7 +104,7 @@
     font-family:var(--font-body);font-size:13px;color:var(--ink);
     border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:#fff;
   }
-  .reset-link{margin-left:auto;font-family:var(--font-body);font-size:12px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:underline;}
+  .reset-link{margin-left:auto;font-family:var(--font-body);font-size:12px;font-weight:600;color:var(--teal);cursor:var(--gold-cursor);text-decoration:underline;}
 
   /* ---------- Layout ---------- */
   .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;color:var(--ink);box-shadow:0 2px 10px rgba(10,31,68,.05);}
@@ -164,7 +165,7 @@
   table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:480px;}
   thead th{
     position:sticky;top:0;text-align:right;font-family:var(--font-body);font-size:10px;letter-spacing:0.4px;text-transform:uppercase;
-    color:#CBD4E5;padding:10px 10px;background:var(--navy-deep);border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+    color:#CBD4E5;padding:10px 10px;background:var(--navy-deep);border-bottom:1px solid var(--line);cursor:var(--gold-cursor);user-select:none;
     white-space:nowrap;font-weight:600;
   }
   thead th:first-child{text-align:left;}
@@ -194,7 +195,7 @@
   .comment-filter-row{display:flex;gap:6px;margin-bottom:12px;}
   .chip-btn{
     font-family:var(--font-body);font-size:11px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);
-    background:#fff;cursor:pointer;color:var(--ink-soft);font-weight:600;
+    background:#fff;cursor:var(--gold-cursor);color:var(--ink-soft);font-weight:600;
   }
   .chip-btn.active{background:var(--gold);color:var(--navy-deep);border-color:var(--gold);}
 
@@ -227,7 +228,7 @@
   .days-note{font-family:var(--font-body);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#CBD4E5;font-weight:600;margin-bottom:9px;}
 
   /* ---------- KPI donut cards ---------- */
-  .flap.kpi-donut-card{cursor:pointer;transition:box-shadow .15s ease, transform .1s ease;}
+  .flap.kpi-donut-card{cursor:var(--gold-cursor);transition:box-shadow .15s ease, transform .1s ease;}
   .flap.kpi-donut-card:hover{box-shadow:0 4px 16px rgba(10,31,68,.12);transform:translateY(-1px);}
   .flap.kpi-donut-card.selected{box-shadow:0 0 0 2px var(--gold);}
   .kpi-donut-wrap{position:relative;width:132px;height:132px;margin:2px auto 2px;}
@@ -243,12 +244,12 @@
   }
   .breakdown-panel h2{font-family:var(--font-display);font-size:17px;font-weight:600;margin:0 0 3px;color:var(--navy-deep);padding-left:12px;border-left:4px solid var(--gold);}
   .breakdown-panel .panel-sub{font-family:var(--font-body);font-size:11.5px;color:var(--muted);margin:6px 0 14px 16px;}
-  .breakdown-close{float:right;font-family:var(--font-body);font-size:12px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:underline;}
+  .breakdown-close{float:right;font-family:var(--font-body);font-size:12px;font-weight:600;color:var(--teal);cursor:var(--gold-cursor);text-decoration:underline;}
 
   /* ---------- Expanded top-row cards (in-place company breakdown) ---------- */
   .flap.expanded, .panel.expanded{padding:16px 16px 18px;}
   .flap.expanded .label{text-align:left;margin-bottom:4px;}
-  .flap .close-x, .panel .close-x{float:right;font-family:var(--font-body);font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600;}
+  .flap .close-x, .panel .close-x{float:right;font-family:var(--font-body);font-size:10.5px;color:var(--muted);cursor:var(--gold-cursor);font-weight:600;}
   .flap .close-x:hover, .panel .close-x:hover{color:var(--red);}
   .split-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
   .split-col{flex:1;background:#123C6B;border-radius:10px;padding:14px 10px 16px;text-align:center;}
@@ -256,14 +257,14 @@
   .split-col .value{color:#fff;font-family:var(--font-display);font-weight:700;}
   .split-col .donut-center .num{color:#fff;}
   .split-col .split-gauge-num{color:#fff;font-family:var(--font-display);font-weight:700;font-size:15px;margin-top:6px;}
-  .nps-row-3col .panel{cursor:pointer;}
+  .nps-row-3col .panel{cursor:var(--gold-cursor);}
 
   /* ---------- View tabs (Dashboard / Info) ---------- */
   .view-tabs-wrap{background:var(--navy-deep);padding:0 28px;border-bottom:1px solid #1B3B6B;}
   .view-tabs{display:flex;gap:4px;max-width:1500px;margin:0 auto;}
   .view-tabs button{
     font-family:var(--font-display);font-size:13px;font-weight:600;color:#fff;background:transparent;
-    border:none;padding:11px 20px;cursor:pointer;border-bottom:3px solid transparent;letter-spacing:0.2px;
+    border:none;padding:11px 20px;cursor:var(--gold-cursor);border-bottom:3px solid transparent;letter-spacing:0.2px;
   }
   .view-tabs button.active{color:var(--gold);border-bottom-color:var(--gold);}
   .view-tabs button:not(.active):hover{color:var(--gold);}
@@ -316,14 +317,15 @@
     <label>Branch</label>
     <select id="branchFilter"><option value="ALL">All branches</option></select>
   </div>
+  <button type="button" id="excludeAnomaliesBtn" class="chip-btn" style="font-weight:700;"></button>
   <div class="reset-link" id="resetFilters">Reset filters</div>
 </div>
 
 <div class="content-grid">
   <div class="full nps-row-3col" id="npsRow"></div>
 
-  <div class="panel full">
-    <h2>Customer Sentiment <span id="sentimentExpandIcon" style="float:right;font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:underline;">Show by company ⤢</span></h2>
+  <div class="panel full" id="sentimentRowPanel" style="cursor:var(--gold-cursor);">
+    <h2>Customer Sentiment</h2>
     <div class="panel-sub">Positive / Neutral / Negative share of comments, from keyword-based scoring</div>
     <div id="commentSentimentSummary"></div>
   </div>
@@ -529,7 +531,8 @@ function maskIp(ip){
   return ip.slice(0, Math.ceil(ip.length/2)) + '**';
 }
 function computeAnomalies(rawRows){
-  const withDt = rawRows.map(r => ({ ...r, dt: parseTimestamp(r.ts) })).filter(r => r.dt);
+  const withDt = rawRows.map((r,i) => ({ ...r, _idx:i, dt: parseTimestamp(r.ts) })).filter(r => r.dt);
+  const flaggedIdx = new Set();
 
   // Repeat-submission clusters: same mobile + branch, whole group span <= 30 min
   const groups = {};
@@ -545,6 +548,7 @@ function computeAnomalies(rawRows){
     const spanMin = (list[list.length-1].dt - list[0].dt) / 60000;
     if (spanMin <= 30){
       const avgHappy = round1(list.reduce((s,r)=>s+r.hp,0) / list.length);
+      list.forEach(r => flaggedIdx.add(r._idx));
       bursts.push({
         brand: list[0].br, branch: list[0].bh, mobile_masked: maskId(list[0].mob),
         count: list.length, span_min: Math.round(spanMin*10)/10,
@@ -559,10 +563,13 @@ function computeAnomalies(rawRows){
   withDt.forEach(r => {
     const cid = r.cid, mob = r.mob;
     if (cid === '0' && mob === '0'){
+      flaggedIdx.add(r._idx);
       issues.push({ brand:r.br, branch:r.bh, issue:'Civil ID and Mobile both recorded as 0', value:'0', timestamp: fmtTs(r.dt) });
     } else if (cid === '123456789123'){
+      flaggedIdx.add(r._idx);
       issues.push({ brand:r.br, branch:r.bh, issue:'Civil ID is a sequential placeholder (123456789123)', value:cid, timestamp: fmtTs(r.dt) });
     } else if (cid && cid.length !== 12){
+      flaggedIdx.add(r._idx);
       issues.push({ brand:r.br, branch:r.bh, issue:`Civil ID has ${cid.length} digit(s) (expected 12)`, value: maskId(cid), timestamp: fmtTs(r.dt) });
     }
   });
@@ -580,6 +587,7 @@ function computeAnomalies(rawRows){
   Object.values(ipGroups).forEach(list => {
     if (list.length < 2) return;
     list.sort((a,b) => a.dt - b.dt);
+    list.forEach(r => flaggedIdx.add(r._idx));
     ipClusters.push({
       brand: list[0].br, branch: list[0].bh, ip_masked: maskIp(list[0].ip),
       count: list.length, first: fmtTs(list[0].dt), last: fmtTs(list[list.length-1].dt)
@@ -587,7 +595,7 @@ function computeAnomalies(rawRows){
   });
   ipClusters.sort((a,b) => b.count - a.count);
 
-  return { bursts, issues, ipClusters, ipDataPresent };
+  return { bursts, issues, ipClusters, ipDataPresent, flaggedIdx };
 }
 
 // ---- CSV fetch + column mapping ----
@@ -680,8 +688,12 @@ async function bootData(){
     rawRows = RAW_FALLBACK;
   }
 
-  RECORDS = rawRows.map(deriveCompactRecord).filter(Boolean);
   ANOMALY = computeAnomalies(rawRows);
+  RECORDS = rawRows.map((row, i) => {
+    const rec = deriveCompactRecord(row);
+    if (rec) rec.flag = ANOMALY.flaggedIdx.has(i);
+    return rec;
+  }).filter(Boolean);
   ALL_BRANDS = [...new Set(RECORDS.map(r => r.br))].sort();
   ALL_DATES = [...new Set(RECORDS.map(r => r.d))];
 
@@ -693,7 +705,7 @@ async function bootData(){
 bootData();
 </script>
 <script>// ============ State ============
-const state = { brand: 'ALL', branch: 'ALL', focusMetric: null, focusMetric2: null, sentimentRowEnlarged: false };
+const state = { brand: 'ALL', branch: 'ALL', focusMetric: null, focusMetric2: null, sentimentRowEnlarged: false, excludeAnomalies: false };
 
 // Light-card chart theme (matches the Retail Performance Dashboard palette)
 Chart.defaults.color = '#2E4372';
@@ -710,6 +722,7 @@ function filteredRecords({ brand = state.brand, branch = state.branch, ignoreBra
   return RECORDS.filter(r => {
     if (brand !== 'ALL' && r.br !== brand) return false;
     if (!ignoreBranch && branch !== 'ALL' && r.bh !== branch) return false;
+    if (state.excludeAnomalies && r.flag) return false;
     return true;
   });
 }
@@ -926,7 +939,7 @@ function renderBoard(){
     let body;
     if (!expanded){
       if (key==='responses'){
-        body = `<div class="value">${agg.n.toLocaleString()}</div><div class="sub">${state.brand==='ALL' ? 'Combined' : state.brand}</div>`;
+        body = `<div class="value">${agg.n.toLocaleString()}</div><div class="sub">${state.brand==='ALL' ? 'Combined' : state.brand}${state.excludeAnomalies ? ' · anomalies excluded' : ''}</div>`;
       } else if (key==='csat'){
         body = `<div class="kpi-gauge-wrap" id="kpiGauge_csat"></div><div class="kpi-gauge-num">${metricValue(agg,'csat').toFixed(0)} <span style="font-size:12px;color:var(--muted);font-weight:500;font-family:var(--font-body);">/ 100</span></div>`;
       } else if (key==='branchSpread'){
@@ -1420,7 +1433,7 @@ function renderAnomalies(){
   const bursts = ANOMALY.bursts.filter(b => brands.includes(b.brand) && (state.branch==='ALL' || b.branch===state.branch));
   const issues = ANOMALY.issues.filter(i => brands.includes(i.brand) && (state.branch==='ALL' || i.branch===state.branch));
   const ipClusters = (ANOMALY.ipClusters||[]).filter(c => brands.includes(c.brand) && (state.branch==='ALL' || c.branch===state.branch));
-  const totalN = filteredRecords().length;
+  const totalN = RECORDS.filter(r => brands.includes(r.br) && (state.branch==='ALL' || r.bh===state.branch)).length;
   const flaggedRows = bursts.reduce((a,b)=>a+b.count,0) + issues.length + ipClusters.reduce((a,c)=>a+c.count,0);
 
   document.getElementById('anomalyFlags').innerHTML = `
@@ -1616,11 +1629,31 @@ function renderCommentFeed(){
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 // ============ Wiring ============
+function flaggedCountForCurrentFilter(){
+  const brands = state.brand === 'ALL' ? ALL_BRANDS : [state.brand];
+  return RECORDS.filter(r => brands.includes(r.br) && (state.branch==='ALL' || r.bh===state.branch) && r.flag).length;
+}
+function renderExcludeAnomaliesBtn(){
+  const btn = document.getElementById('excludeAnomaliesBtn');
+  if (!btn) return;
+  const n = flaggedCountForCurrentFilter();
+  if (n === 0){
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  btn.classList.toggle('active', state.excludeAnomalies);
+  btn.textContent = state.excludeAnomalies
+    ? `✕ Excluding ${n} flagged response${n===1?'':'s'} — click to include`
+    : `Recalculate excluding ${n} flagged response${n===1?'':'s'}`;
+}
+
 function renderAll(){
   renderBoard();
   renderNpsRow();
   document.getElementById('branchDetailSection').style.display = state.brand !== 'ALL' ? '' : 'none';
   document.getElementById('branchFilterGroup').style.display = state.brand !== 'ALL' ? '' : 'none';
+  renderExcludeAnomaliesBtn();
   renderTopBottom();
   renderBranchTable();
   renderAnomalies();
@@ -1641,10 +1674,15 @@ window.initDashboardApp = function(){
 if (!window.__dashboardListenersAttached){
   window.__dashboardListenersAttached = true;
 
-  document.getElementById('sentimentExpandIcon').addEventListener('click', () => {
+  document.getElementById('sentimentRowPanel').addEventListener('click', () => {
     state.sentimentRowEnlarged = !state.sentimentRowEnlarged;
-    document.getElementById('sentimentExpandIcon').textContent = state.sentimentRowEnlarged ? 'Show combined ⤡' : 'Show by company ⤢';
     renderCommentSentimentSummary();
+  });
+
+  document.getElementById('excludeAnomaliesBtn').addEventListener('click', () => {
+    state.excludeAnomalies = !state.excludeAnomalies;
+    state.focusMetric = null; state.focusMetric2 = null;
+    renderAll();
   });
 
   document.getElementById('brandToggle').addEventListener('click', e => {
@@ -1683,7 +1721,7 @@ if (!window.__dashboardListenersAttached){
   });
 
   document.getElementById('resetFilters').addEventListener('click', () => {
-    state.brand = 'ALL'; state.branch = 'ALL'; state.focusMetric = null; state.focusMetric2 = null;
+    state.brand = 'ALL'; state.branch = 'ALL'; state.focusMetric = null; state.focusMetric2 = null; state.excludeAnomalies = false;
     document.querySelectorAll('#brandToggle button').forEach(b => b.classList.toggle('active', b.dataset.brand==='ALL'));
     document.getElementById('branchSearch').value=''; document.getElementById('commentSearch').value='';
     commentFilter='ALL';
