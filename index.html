@@ -360,6 +360,11 @@
       </table>
     </div>
   </div>
+  <div class="panel full" style="margin-top:20px;">
+    <h2>Negative Sentiment Responses</h2>
+    <div class="panel-sub">Comments scored Negative by keyword-based sentiment analysis · <span id="negSentimentCount"></span></div>
+    <div class="comment-feed" id="negSentimentList" style="max-height:420px;"></div>
+  </div>
   </div>
 </div>
 </div>
@@ -1628,6 +1633,28 @@ function renderCommentFeed(){
 }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ============ Negative sentiment list (company-wise views only) ============
+function renderNegativeSentimentList(){
+  const el = document.getElementById('negSentimentList');
+  const countEl = document.getElementById('negSentimentCount');
+  if (!el) return;
+  if (state.brand === 'ALL'){ if (countEl) countEl.textContent = ''; el.innerHTML = ''; return; }
+
+  const recs = filteredRecords().filter(r => r.c && scoreCommentSentiment(r.c) < 0).slice().reverse();
+  if (countEl) countEl.textContent = `${recs.length} shown`;
+  if (recs.length === 0){ el.innerHTML = '<div class="empty-state">No negative-sentiment comments in this filter.</div>'; return; }
+  el.innerHTML = recs.map(r => `
+    <div class="comment">
+      <div class="comment-meta">
+        <span class="score-dot" style="background:${CAT_COLOR[r.nc]}"></span>
+        <span>${r.bh}</span><span>·</span><span>${r.br}</span><span>·</span><span>${CAT_LABEL[r.nc]}</span>
+        <span class="sentiment-chip" style="color:var(--detractor);border-color:var(--detractor);">Negative</span>
+      </div>
+      <div class="comment-text">${escapeHtml(r.c)}</div>
+    </div>
+  `).join('');
+}
+
 // ============ Wiring ============
 function flaggedCountForCurrentFilter(){
   const brands = state.brand === 'ALL' ? ALL_BRANDS : [state.brand];
@@ -1656,6 +1683,7 @@ function renderAll(){
   renderExcludeAnomaliesBtn();
   renderTopBottom();
   renderBranchTable();
+  renderNegativeSentimentList();
   renderAnomalies();
   renderCommentSentimentSummary();
   renderCommentFeed();
