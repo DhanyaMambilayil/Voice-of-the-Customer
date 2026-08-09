@@ -381,6 +381,15 @@
         <tbody id="issueTableBody"></tbody>
       </table>
     </div>
+
+    <h3 style="font-family:var(--font-body);font-size:13px;margin:18px 0 8px;">Multiple entries from the same IP address</h3>
+    <div class="panel-sub" style="margin-bottom:10px;">Same IP address submitting more than once at the same branch</div>
+    <div class="table-scroll" style="max-height:280px;" id="ipClusterWrap">
+      <table class="anomaly-table">
+        <thead><tr><th>Branch</th><th>Brand</th><th>IP address (masked)</th><th>Entries</th><th>First → Last</th></tr></thead>
+        <tbody id="ipClusterTableBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel full">
@@ -408,7 +417,7 @@
     <div><b>Comment rate</b> — % of respondents who left any text in the Improvement field.</div>
     <div><b>Response share</b> — a branch's responses as a % of its brand's total responses.</div>
     <div><b>Top / bottom branches</b> — ranked by NPS; branches with fewer than 5 responses are excluded from ranking, since a handful of ratings can swing NPS by ±50 or more.</div>
-    <div><b>Anomaly detection</b> — flags (a) the same phone number rating the same branch more than once within 30 minutes, and (b) rows with malformed, placeholder, or missing Civil ID/Mobile values. These are statistical red flags for further review, not confirmed fraud.</div>
+    <div><b>Anomaly detection</b> — flags (a) the same phone number rating the same branch more than once within 30 minutes, (b) rows with malformed, placeholder, or missing Civil ID/Mobile values, and (c) the same IP address submitting more than once at the same branch. These are statistical red flags for further review, not confirmed fraud.</div>
     <div><b>Sentiment score</b> — a lightweight keyword-based read of the "Improvement" comments (English text), not a trained language model. Each comment is scored by counting positive vs. negative words/phrases; score = %Positive − %Negative, on a −100 to +100 scale. Treat it as a rough signal for spotting friction points, not a precise measurement — especially for comments in other languages, which the lexicon won't score.</div>
   </div>
 </footer>
@@ -439,7 +448,7 @@ const SHEET_URLS = [
 ];
 
 let RECORDS = [];
-let ANOMALY = { bursts: [], issues: [] };
+let ANOMALY = { bursts: [], issues: [], ipClusters: [], ipDataPresent: false };
 let ALL_BRANDS = [];
 let ALL_DATES = [];
 
@@ -508,6 +517,12 @@ function maskId(v){
   if (s.length <= 4) return s[0] + '**' + s[s.length-1];
   return s.slice(0,2) + '*'.repeat(s.length-4) + s.slice(-2);
 }
+function maskIp(ip){
+  const parts = String(ip).split('.');
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.***.**`;
+  if (ip.length <= 6) return ip;
+  return ip.slice(0, Math.ceil(ip.length/2)) + '**';
+}
 function computeAnomalies(rawRows){
   const withDt = rawRows.map(r => ({ ...r, dt: parseTimestamp(r.ts) })).filter(r => r.dt);
 
@@ -547,7 +562,27 @@ function computeAnomalies(rawRows){
     }
   });
 
-  return { bursts, issues };
+  // Repeat IP address clusters: same IP + branch + brand, multiple entries
+  const ipGroups = {};
+  let ipDataPresent = false;
+  withDt.forEach(r => {
+    if (!r.ip) return;
+    ipDataPresent = true;
+    const k = r.br + '|' + r.bh + '|' + r.ip;
+    (ipGroups[k] = ipGroups[k] || []).push(r);
+  });
+  const ipClusters = [];
+  Object.values(ipGroups).forEach(list => {
+    if (list.length < 2) return;
+    list.sort((a,b) => a.dt - b.dt);
+    ipClusters.push({
+      brand: list[0].br, branch: list[0].bh, ip_masked: maskIp(list[0].ip),
+      count: list.length, first: fmtTs(list[0].dt), last: fmtTs(list[list.length-1].dt)
+    });
+  });
+  ipClusters.sort((a,b) => b.count - a.count);
+
+  return { bursts, issues, ipClusters, ipDataPresent };
 }
 
 // ---- CSV fetch + column mapping ----
@@ -574,9 +609,10 @@ function mapBrandRows(csvRows, brand, nativeCol){
     const native = toNum(r[nativeCol]);
     if (![hp,rs,sp,va,native].every(Number.isFinite)) return;
     const c = (r['Improvement']||'').toString().trim();
+    const ip = cleanIdField(r['IP Address'] ?? r['IP'] ?? r['Ip Address'] ?? r['IPAddress'] ?? r['ip']);
     out.push({
       br: brand, bh: String(bh).trim(), ts: String(ts).trim(),
-      cid: cleanIdField(r['Civil ID']), mob: cleanIdField(r['Mobile']),
+      cid: cleanIdField(r['Civil ID']), mob: cleanIdField(r['Mobile']), ip,
       hp, rs, sp, va, native, c: c === '' ? null : c
     });
   });
@@ -609,20 +645,23 @@ async function loadLiveRawRows(){
 function setDataStatus(mode, detail){
   const el = document.getElementById('dataStatus');
   if (!el) return;
+  const timeStr = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
   if (mode === 'live'){
-    el.textContent = '● Live — connected to Google Sheets';
-    el.style.color = '#6FE3A6';
+    el.innerHTML = `<span style="color:#6FE3A6;">● Live</span> · Updated ${timeStr} <span id="refreshBtn" title="Refresh now" style="cursor:pointer;text-decoration:underline;margin-left:4px;">⟳</span>`;
   } else if (mode === 'cached'){
-    el.textContent = '● Showing cached snapshot — live sheet unavailable';
-    el.style.color = '#E8A33D';
-    el.title = detail || '';
+    el.innerHTML = `<span style="color:#E8A33D;">● Cached</span> · Updated ${timeStr} <span id="refreshBtn" title="Refresh now" style="cursor:pointer;text-decoration:underline;margin-left:4px;">⟳</span>`;
+    if (detail) el.title = detail;
   } else {
-    el.textContent = '● Loading…';
-    el.style.color = '#B9C3D6';
+    el.innerHTML = `<span style="color:#B9C3D6;">● Loading…</span>`;
   }
+  const btn = document.getElementById('refreshBtn');
+  if (btn) btn.addEventListener('click', () => bootData());
 }
 
+let isBooting = false;
 async function bootData(){
+  if (isBooting) return;
+  isBooting = true;
   setDataStatus('loading');
   let rawRows = null;
   let mode = 'cached';
@@ -631,7 +670,7 @@ async function bootData(){
     rawRows = await loadLiveRawRows();
     mode = 'live';
   } catch(err){
-    console.warn('[VOC Dashboard] Live Google Sheets fetch failed — falling back to cached snapshot.', err);
+    console.warn('[VOC Dashboard] Live data fetch failed — falling back to cached snapshot.', err);
     errDetail = err.message || String(err);
     rawRows = RAW_FALLBACK;
   }
@@ -643,6 +682,7 @@ async function bootData(){
 
   setDataStatus(mode, errDetail);
   if (typeof window.initDashboardApp === 'function') window.initDashboardApp();
+  isBooting = false;
 }
 
 bootData();
@@ -1310,14 +1350,16 @@ function renderAnomalies(){
   const brands = state.brand === 'ALL' ? ALL_BRANDS : [state.brand];
   const bursts = ANOMALY.bursts.filter(b => brands.includes(b.brand) && (state.branch==='ALL' || b.branch===state.branch));
   const issues = ANOMALY.issues.filter(i => brands.includes(i.brand) && (state.branch==='ALL' || i.branch===state.branch));
+  const ipClusters = (ANOMALY.ipClusters||[]).filter(c => brands.includes(c.brand) && (state.branch==='ALL' || c.branch===state.branch));
   const totalN = filteredRecords().length;
-  const flaggedRows = bursts.reduce((a,b)=>a+b.count,0) + issues.length;
+  const flaggedRows = bursts.reduce((a,b)=>a+b.count,0) + issues.length + ipClusters.reduce((a,c)=>a+c.count,0);
 
   document.getElementById('anomalyFlags').innerHTML = `
     <div class="anomaly-flag"><div class="n">${flaggedRows}</div><div class="l">Flagged responses</div></div>
     <div class="anomaly-flag"><div class="n">${totalN ? (flaggedRows/totalN*100).toFixed(1) : '0.0'}%</div><div class="l">Of filtered responses</div></div>
     <div class="anomaly-flag"><div class="n">${bursts.length}</div><div class="l">Repeat-submission clusters</div></div>
     <div class="anomaly-flag"><div class="n">${issues.length}</div><div class="l">Identity integrity issues</div></div>
+    <div class="anomaly-flag"><div class="n">${ipClusters.length}</div><div class="l">Repeat IP clusters</div></div>
   `;
 
   const byBranchCount = {};
@@ -1355,6 +1397,21 @@ function renderAnomalies(){
       <td class="num">${i.value}</td>
       <td class="num">${i.timestamp}</td>
     </tr>`).join('') : '<tr><td colspan="5" class="empty-state">No issues in this filter.</td></tr>';
+
+  const ipBody = document.getElementById('ipClusterTableBody');
+  if (!ANOMALY.ipDataPresent){
+    ipBody.innerHTML = '<tr><td colspan="5" class="empty-state">No IP Address column found in the current data source — nothing to check.</td></tr>';
+  } else {
+    const sortedIp = ipClusters.slice().sort((a,b)=>b.count-a.count);
+    ipBody.innerHTML = sortedIp.length ? sortedIp.map(c => `
+      <tr>
+        <td><span class="sev-dot"></span>${c.branch}</td>
+        <td><span class="brand-chip ${c.brand==='Al Ansari'?'ansari':'bec'}">${c.brand==='Al Ansari'?'Ansari':'BEC'}</span></td>
+        <td class="num">${c.ip_masked}</td>
+        <td class="num">${c.count}</td>
+        <td class="num">${c.first} → ${c.last}</td>
+      </tr>`).join('') : '<tr><td colspan="5" class="empty-state">No repeat-IP clusters in this filter.</td></tr>';
+  }
 }
 
 // ============ Sentiment scoring (lexicon-based, from comment text) ============
@@ -1482,61 +1539,65 @@ function populateBranchFilter(){
 
 window.initDashboardApp = function(){
 
-document.getElementById('brandToggle').addEventListener('click', e => {
-  const btn = e.target.closest('button'); if (!btn) return;
-  document.querySelectorAll('#brandToggle button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  state.brand = btn.dataset.brand;
-  if (state.brand !== 'ALL'){ state.focusMetric = null; state.focusMetric2 = null; }
-  populateBranchFilter();
-  renderAll();
-});
+if (!window.__dashboardListenersAttached){
+  window.__dashboardListenersAttached = true;
 
-document.getElementById('branchFilter').addEventListener('change', e => {
-  state.branch = e.target.value;
-  renderAll();
-});
+  document.getElementById('brandToggle').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    document.querySelectorAll('#brandToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.brand = btn.dataset.brand;
+    if (state.brand !== 'ALL'){ state.focusMetric = null; state.focusMetric2 = null; }
+    populateBranchFilter();
+    renderAll();
+  });
 
-document.getElementById('branchSearch').addEventListener('input', renderBranchTable);
-document.getElementById('commentSearch').addEventListener('input', renderCommentFeed);
+  document.getElementById('branchFilter').addEventListener('change', e => {
+    state.branch = e.target.value;
+    renderAll();
+  });
 
-document.getElementById('commentFilterRow').addEventListener('click', e => {
-  const btn = e.target.closest('.chip-btn'); if (!btn) return;
-  document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  commentFilter = btn.dataset.f;
-  renderCommentFeed();
-});
+  document.getElementById('branchSearch').addEventListener('input', renderBranchTable);
+  document.getElementById('commentSearch').addEventListener('input', renderCommentFeed);
 
-document.querySelector('thead').addEventListener('click', e => {
-  const th = e.target.closest('th'); if (!th) return;
-  const k = th.dataset.key;
-  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
-  document.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted'));
-  th.classList.add('sorted');
-  renderBranchTable();
-});
+  document.getElementById('commentFilterRow').addEventListener('click', e => {
+    const btn = e.target.closest('.chip-btn'); if (!btn) return;
+    document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    commentFilter = btn.dataset.f;
+    renderCommentFeed();
+  });
 
-document.getElementById('resetFilters').addEventListener('click', () => {
-  state.brand = 'ALL'; state.branch = 'ALL'; state.focusMetric = null; state.focusMetric2 = null;
-  document.querySelectorAll('#brandToggle button').forEach(b => b.classList.toggle('active', b.dataset.brand==='ALL'));
-  document.getElementById('branchSearch').value=''; document.getElementById('commentSearch').value='';
-  commentFilter='ALL';
-  document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b=>b.classList.toggle('active', b.dataset.f==='ALL'));
-  populateBranchFilter();
-  renderAll();
-});
+  document.querySelector('thead').addEventListener('click', e => {
+    const th = e.target.closest('th'); if (!th) return;
+    const k = th.dataset.key;
+    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
+    document.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted'));
+    th.classList.add('sorted');
+    renderBranchTable();
+  });
 
-document.getElementById('viewTabs').addEventListener('click', e => {
-  const btn = e.target.closest('button'); if (!btn) return;
-  document.querySelectorAll('#viewTabs button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const view = btn.dataset.view;
-  document.getElementById('dashboardView').style.display = view === 'dashboard' ? '' : 'none';
-  document.getElementById('infoView').style.display = view === 'info' ? '' : 'none';
-});
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    state.brand = 'ALL'; state.branch = 'ALL'; state.focusMetric = null; state.focusMetric2 = null;
+    document.querySelectorAll('#brandToggle button').forEach(b => b.classList.toggle('active', b.dataset.brand==='ALL'));
+    document.getElementById('branchSearch').value=''; document.getElementById('commentSearch').value='';
+    commentFilter='ALL';
+    document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b=>b.classList.toggle('active', b.dataset.f==='ALL'));
+    populateBranchFilter();
+    renderAll();
+  });
 
-// ============ Init ============
+  document.getElementById('viewTabs').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    document.querySelectorAll('#viewTabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const view = btn.dataset.view;
+    document.getElementById('dashboardView').style.display = view === 'dashboard' ? '' : 'none';
+    document.getElementById('infoView').style.display = view === 'info' ? '' : 'none';
+  });
+}
+
+// ============ (Re)render ============
 document.getElementById('daysNote').textContent = `${ALL_DATES.length} days measured`;
 
 populateBranchFilter();
