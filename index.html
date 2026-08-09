@@ -250,7 +250,7 @@
   .flap.expanded .label{text-align:left;margin-bottom:4px;}
   .flap .close-x, .panel .close-x{float:right;font-family:var(--font-body);font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600;}
   .flap .close-x:hover, .panel .close-x:hover{color:var(--red);}
-  .split-row{display:flex;gap:10px;margin-top:8px;}
+  .split-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
   .split-col{flex:1;background:#123C6B;border-radius:10px;padding:14px 10px 16px;text-align:center;}
   .split-col .split-title{font-family:var(--font-body);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#B9C3D6;font-weight:700;margin-bottom:6px;}
   .split-col .value{color:#fff;font-family:var(--font-display);font-weight:700;}
@@ -735,13 +735,18 @@ function aggregate(records){
   const speedPct = (q.sp - 1) / 4 * 100;
   const commentedRecs = records.filter(r=>r.c);
   let sentimentScore = null, sentimentN = commentedRecs.length;
+  let sentimentPosPct = 0, sentimentNeuPct = 0, sentimentNegPct = 0;
   if (commentedRecs.length){
-    let sPos=0, sNeg=0;
-    commentedRecs.forEach(r => { const sc = scoreCommentSentiment(r.c); if (sc>0) sPos++; else if (sc<0) sNeg++; });
+    let sPos=0, sNeg=0, sNeu=0;
+    commentedRecs.forEach(r => { const sc = scoreCommentSentiment(r.c); if (sc>0) sPos++; else if (sc<0) sNeg++; else sNeu++; });
     sentimentScore = Math.round((sPos-sNeg)/commentedRecs.length*100);
+    sentimentPosPct = sPos/commentedRecs.length*100;
+    sentimentNeuPct = sNeu/commentedRecs.length*100;
+    sentimentNegPct = sNeg/commentedRecs.length*100;
   }
   return {
-    n, branches, sat, trust, satPct, trustPct, topbox, nps, respectPct, speedPct, sentimentScore, sentimentN,
+    n, branches, sat, trust, satPct, trustPct, topbox, nps, respectPct, speedPct,
+    sentimentScore, sentimentN, sentimentPosPct, sentimentNeuPct, sentimentNegPct,
     promoterPct: promoters/n*100, passivePct: passives/n*100, detractorPct: detractors/n*100,
     commentRate: withComment/n*100, q
   };
@@ -1071,6 +1076,29 @@ function makeDonut(canvas, pct, color){
     }
   });
 }
+// Three-slice donut for Sentiment Score — Positive / Neutral / Negative shares,
+// instead of a single fill-vs-track ring.
+function makeTriDonut(canvas, posPct, neuPct, negPct){
+  const vals = [posPct, neuPct, negPct];
+  const total = vals.reduce((a,b)=>a+b,0);
+  const data = total > 0 ? vals : [0, 100, 0];
+  return new Chart(canvas, {
+    type:'doughnut',
+    data:{
+      datasets:[{
+        data,
+        backgroundColor:['#1E7145', '#94A3B8', '#B23B3B'],
+        borderWidth:0,
+      }]
+    },
+    options:{
+      cutout:'72%',
+      plugins:{ legend:{ display:false }, tooltip:{ enabled:false } },
+      animation:{ duration:500 },
+      events:[]
+    }
+  });
+}
 
 function renderDonutPanel(containerId, valueFn){
   (donutChartsByPanel[containerId] || []).forEach(c => c.destroy());
@@ -1178,9 +1206,15 @@ function renderNpsRow(){
     let body;
     if (ROW2_DONUT_KEYS.includes(key)){
       const sub = key === 'sentiment' ? (agg && agg.sentimentN ? `From ${agg.sentimentN} comments` : 'No comments') : 'Overall, combined';
+      const legend = key === 'sentiment'
+        ? `<div class="nps-legend" style="justify-content:center;margin-top:10px;">
+             <span><span class="dot" style="background:#1E7145"></span>Positive</span>
+             <span><span class="dot" style="background:#94A3B8"></span>Neutral</span>
+             <span><span class="dot" style="background:#B23B3B"></span>Negative</span>
+           </div>` : '';
       body = expanded
         ? `<span class="close-x">Close ✕</span><div class="split-row" id="split_${key}"></div>`
-        : `<div class="panel-sub">${sub}</div><div class="donut-wrap" style="margin:6px auto 0;"><canvas id="r2ov_${key}"></canvas><div class="donut-center"><div class="num" id="r2ov_${key}_num"></div></div></div>`;
+        : `<div class="panel-sub">${sub}</div><div class="donut-wrap" style="margin:6px auto 0;"><canvas id="r2ov_${key}"></canvas><div class="donut-center"><div class="num" id="r2ov_${key}_num"></div></div></div>${legend}`;
     } else { // npsComposition
       body = `<div class="panel-sub">Promoter / Passive / Detractor share of responses</div><div id="npsComposition"></div>`;
     }
@@ -1199,7 +1233,13 @@ function renderNpsRow(){
     const c = document.getElementById('r2ov_' + key);
     if (!c) return;
     destroyRow2Chart(key);
-    row2Charts[key] = makeDonut(c, agg ? metricValue(agg, key) : (key==='sentiment' ? 50 : 0), metricColor(agg || {sentimentScore:0,nps:0}, key));
+    if (key === 'sentiment'){
+      row2Charts[key] = agg
+        ? makeTriDonut(c, agg.sentimentPosPct, agg.sentimentNeuPct, agg.sentimentNegPct)
+        : makeTriDonut(c, 0, 100, 0);
+    } else {
+      row2Charts[key] = makeDonut(c, agg ? metricValue(agg, key) : 0, metricColor(agg || {sentimentScore:0,nps:0}, key));
+    }
     document.getElementById('r2ov_' + key + '_num').textContent = agg ? metricDisplay(agg, key) : '—';
   });
   const compEl = document.getElementById('npsComposition');
@@ -1212,6 +1252,12 @@ function renderNpsRow(){
   if (canExpand && fm && fm !== 'npsComposition'){
     const el = document.getElementById('split_' + fm);
     if (el){
+      const legend = fm === 'sentiment'
+        ? `<div class="nps-legend" style="justify-content:center;flex-basis:100%;margin-top:10px;">
+             <span><span class="dot" style="background:#1E7145"></span>Positive</span>
+             <span><span class="dot" style="background:#94A3B8"></span>Neutral</span>
+             <span><span class="dot" style="background:#B23B3B"></span>Negative</span>
+           </div>` : '';
       el.innerHTML = ALL_BRANDS.map(brand => `
         <div class="split-col">
           <div class="split-title">${brand}</div>
@@ -1219,14 +1265,18 @@ function renderNpsRow(){
             <canvas id="r2_${fm}_${brand.replace(/\s+/g,'')}"></canvas>
             <div class="donut-center"><div class="num" id="r2_${fm}_${brand.replace(/\s+/g,'')}_num" style="font-size:15px;"></div></div>
           </div>
-        </div>`).join('');
+        </div>`).join('') + legend;
       ALL_BRANDS.forEach(brand => {
         const a = aggregate(filteredRecords({ brand }));
         const canvas = document.getElementById(`r2_${fm}_${brand.replace(/\s+/g,'')}`);
         const cid = 'r2_'+fm+'_'+brand;
         destroyRow2Chart(cid);
-        const color = ((fm==='nps' && a && a.nps<0) || (fm==='sentiment' && a && a.sentimentScore<0)) ? '#B23B3B' : BRAND_COLOR[brand];
-        row2Charts[cid] = makeDonut(canvas, a ? metricValue(a, fm) : 0, color);
+        if (fm === 'sentiment'){
+          row2Charts[cid] = a ? makeTriDonut(canvas, a.sentimentPosPct, a.sentimentNeuPct, a.sentimentNegPct) : makeTriDonut(canvas, 0, 100, 0);
+        } else {
+          const color = (fm==='nps' && a && a.nps<0) ? '#B23B3B' : BRAND_COLOR[brand];
+          row2Charts[cid] = makeDonut(canvas, a ? metricValue(a, fm) : 0, color);
+        }
         document.getElementById(`r2_${fm}_${brand.replace(/\s+/g,'')}_num`).textContent = a ? metricDisplay(a, fm) : '—';
       });
     }
