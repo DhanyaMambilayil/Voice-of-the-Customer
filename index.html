@@ -323,7 +323,7 @@
   <div class="full nps-row-3col" id="npsRow"></div>
 
   <div class="panel full">
-    <h2>Customer Sentiment</h2>
+    <h2>Customer Sentiment <span id="sentimentExpandIcon" style="float:right;font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:underline;">Show by company ⤢</span></h2>
     <div class="panel-sub">Positive / Neutral / Negative share of comments, from keyword-based scoring</div>
     <div id="commentSentimentSummary"></div>
   </div>
@@ -693,7 +693,7 @@ async function bootData(){
 bootData();
 </script>
 <script>// ============ State ============
-const state = { brand: 'ALL', branch: 'ALL', focusMetric: null, focusMetric2: null };
+const state = { brand: 'ALL', branch: 'ALL', focusMetric: null, focusMetric2: null, sentimentRowEnlarged: false };
 
 // Light-card chart theme (matches the Retail Performance Dashboard palette)
 Chart.defaults.color = '#2E4372';
@@ -1532,27 +1532,57 @@ function sentimentColorVar(score){
 
 // ============ Comment feed ============
 let commentFilter = 'ALL';
-function renderCommentSentimentSummary(){
-  const el = document.getElementById('commentSentimentSummary');
-  if (!el) return;
-  const recs = filteredRecords().filter(r => r.c);
+function sentimentAgg(records){
+  const recs = records.filter(r => r.c);
   const total = recs.length;
-  if (total === 0){ el.innerHTML = '<div class="empty-state">No comments to analyze.</div>'; return; }
+  if (total === 0) return null;
   let pos=0, neg=0, neu=0;
   recs.forEach(r => {
     const s = scoreCommentSentiment(r.c);
     if (s > 0) pos++; else if (s < 0) neg++; else neu++;
   });
-  const pPos = pos/total*100, pNeu = neu/total*100, pNeg = neg/total*100;
-  const score = Math.round((pos-neg)/total*100);
-  const [wP, wN, wD] = scaleSegments(pPos, pNeu, pNeg);
-  el.innerHTML = `
-    <div class="nps-row-label" style="margin-bottom:8px;"><b>Sentiment score</b><span style="float:right;font-family:var(--font-display);font-weight:700;color:${score>=0?'var(--promoter)':'var(--detractor)'};">${score>=0?'+':''}${score}</span></div>
-    <div class="nps-bar" style="height:22px;">
-      <div class="seg-p" style="width:${wP}%;">${wP>=8?fmtSegPct(pPos):''}</div>
-      <div class="seg-x" style="width:${wN}%;background:#94A3B8;">${wN>=8?fmtSegPct(pNeu):''}</div>
-      <div class="seg-d" style="width:${wD}%;">${wD>=8?fmtSegPct(pNeg):''}</div>
-    </div>
+  return { total, pPos: pos/total*100, pNeu: neu/total*100, pNeg: neg/total*100, score: Math.round((pos-neg)/total*100) };
+}
+function renderCommentSentimentSummary(){
+  const el = document.getElementById('commentSentimentSummary');
+  if (!el) return;
+
+  if (!state.sentimentRowEnlarged){
+    const s = sentimentAgg(filteredRecords());
+    if (!s){ el.innerHTML = '<div class="empty-state">No comments to analyze.</div>'; return; }
+    const [wP, wN, wD] = scaleSegments(s.pPos, s.pNeu, s.pNeg);
+    el.innerHTML = `
+      <div class="nps-row-label" style="margin-bottom:8px;"><b>Sentiment score</b><span style="float:right;font-family:var(--font-display);font-weight:700;color:${s.score>=0?'var(--promoter)':'var(--detractor)'};">${s.score>=0?'+':''}${s.score}</span></div>
+      <div class="nps-bar" style="height:22px;">
+        <div class="seg-p" style="width:${wP}%;">${wP>=8?fmtSegPct(s.pPos):''}</div>
+        <div class="seg-x" style="width:${wN}%;background:#94A3B8;">${wN>=8?fmtSegPct(s.pNeu):''}</div>
+        <div class="seg-d" style="width:${wD}%;">${wD>=8?fmtSegPct(s.pNeg):''}</div>
+      </div>
+      <div class="nps-legend">
+        <span><span class="dot" style="background:var(--promoter)"></span>Positive</span>
+        <span><span class="dot" style="background:#94A3B8"></span>Neutral</span>
+        <span><span class="dot" style="background:var(--detractor)"></span>Negative</span>
+      </div>`;
+    return;
+  }
+
+  // Enlarged: one bar per company
+  const brands = state.brand === 'ALL' ? ALL_BRANDS : [state.brand];
+  const rows = brands.map(brand => {
+    const s = sentimentAgg(filteredRecords({ brand }));
+    if (!s) return `<div class="nps-row"><div class="nps-row-label"><b>${brand}</b></div><div class="empty-state" style="padding:10px 0;">No comments.</div></div>`;
+    const [wP, wN, wD] = scaleSegments(s.pPos, s.pNeu, s.pNeg);
+    return `
+      <div class="nps-row">
+        <div class="nps-row-label" style="font-size:13px;"><b>${brand}</b> <span style="font-weight:400;color:var(--muted);">· ${s.score>=0?'+':''}${s.score} · from ${s.total} comments</span></div>
+        <div class="nps-bar" style="height:34px;">
+          <div class="seg-p" style="width:${wP}%;font-size:13px;">${wP>=6?fmtSegPct(s.pPos):''}</div>
+          <div class="seg-x" style="width:${wN}%;font-size:13px;background:#94A3B8;">${wN>=6?fmtSegPct(s.pNeu):''}</div>
+          <div class="seg-d" style="width:${wD}%;font-size:13px;">${wD>=6?fmtSegPct(s.pNeg):''}</div>
+        </div>
+      </div>`;
+  }).join('');
+  el.innerHTML = rows + `
     <div class="nps-legend">
       <span><span class="dot" style="background:var(--promoter)"></span>Positive</span>
       <span><span class="dot" style="background:#94A3B8"></span>Neutral</span>
@@ -1610,6 +1640,12 @@ window.initDashboardApp = function(){
 
 if (!window.__dashboardListenersAttached){
   window.__dashboardListenersAttached = true;
+
+  document.getElementById('sentimentExpandIcon').addEventListener('click', () => {
+    state.sentimentRowEnlarged = !state.sentimentRowEnlarged;
+    document.getElementById('sentimentExpandIcon').textContent = state.sentimentRowEnlarged ? 'Show combined ⤡' : 'Show by company ⤢';
+    renderCommentSentimentSummary();
+  });
 
   document.getElementById('brandToggle').addEventListener('click', e => {
     const btn = e.target.closest('button'); if (!btn) return;
