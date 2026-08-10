@@ -403,25 +403,22 @@
         <tbody id="ipClusterTableBody"></tbody>
       </table>
     </div>
-  </div>
 
-  <div class="panel full">
-    <h2>Customer voice</h2>
-    <div class="panel-sub">Raw comments from the "Improvement" field · <span id="commentCount"></span></div>
-    <div class="comment-filter-row" id="commentFilterRow">
-      <button class="chip-btn active" data-f="ALL">All</button>
-      <button class="chip-btn" data-f="D">Detractors only</button>
-      <button class="chip-btn" data-f="P">Promoters only</button>
+    <h3 style="font-family:var(--font-body);font-size:13px;margin:18px 0 8px;">Multiple entries from the same IP address — different branches</h3>
+    <div class="panel-sub" style="margin-bottom:10px;">Same IP address submitting to more than one branch — a stronger signal than repeating at one branch</div>
+    <div class="table-scroll" style="max-height:280px;" id="ipCrossBranchWrap">
+      <table class="anomaly-table">
+        <thead><tr><th>Brand</th><th>IP address (masked)</th><th>Branches</th><th>Branch count</th><th>Total entries</th><th>First → Last</th></tr></thead>
+        <tbody id="ipCrossBranchTableBody"></tbody>
+      </table>
     </div>
-    <input type="text" id="commentSearch" class="search-box" placeholder="Search comments…">
-    <div class="comment-feed" id="commentFeed"></div>
   </div>
 </div>
 
 <footer>
   <div class="methodology">
     <h3>Metric definitions</h3>
-    <div><b>CSAT</b> — average of Happy, Respect, Speed and Visit-Again scores, converted from a 1–5 scale to a 0–100% index.</div>
+    <div><b>CSAT</b> — % of responses where the average of Happy, Respect and Speed (each 1–5) is 4 or higher — i.e. the share of "satisfied" responses, the standard CSAT formula, rather than an averaged score.</div>
     <div><b>Trust Score</b> — average of Respect and Visit-Again scores, converted to a 0–100% index.</div>
     <div><b>Top-box rate</b> — % of respondents who gave the maximum score (5/5) on the Happy question.</div>
     <div><b>NPS — Al Ansari</b> — computed from the native 0–10 recommend question: Promoter 9–10, Passive 7–8, Detractor 0–6. NPS = %Promoter − %Detractor.</div>
@@ -460,7 +457,7 @@ const SHEET_URLS = [
 ];
 
 let RECORDS = [];
-let ANOMALY = { bursts: [], issues: [], ipClusters: [], ipDataPresent: false };
+let ANOMALY = { bursts: [], issues: [], ipClusters: [], ipCrossBranch: [], ipDataPresent: false };
 let ALL_BRANDS = [];
 let ALL_DATES = [];
 
@@ -600,7 +597,30 @@ function computeAnomalies(rawRows){
   });
   ipClusters.sort((a,b) => b.count - a.count);
 
-  return { bursts, issues, ipClusters, ipDataPresent, flaggedIdx };
+  // Same IP address used across more than one branch (same brand) — a stronger
+  // signal than repeating at a single branch, e.g. one device/network rating
+  // several locations.
+  const ipBrandGroups = {};
+  withDt.forEach(r => {
+    if (!r.ip) return;
+    const k = r.br + '|' + r.ip;
+    (ipBrandGroups[k] = ipBrandGroups[k] || []).push(r);
+  });
+  const ipCrossBranch = [];
+  Object.values(ipBrandGroups).forEach(list => {
+    const branchSet = new Set(list.map(r => r.bh));
+    if (branchSet.size < 2) return;
+    list.sort((a,b) => a.dt - b.dt);
+    list.forEach(r => flaggedIdx.add(r._idx));
+    ipCrossBranch.push({
+      brand: list[0].br, ip_masked: maskIp(list[0].ip),
+      branches: [...branchSet].join(', '), branchCount: branchSet.size, count: list.length,
+      first: fmtTs(list[0].dt), last: fmtTs(list[list.length-1].dt)
+    });
+  });
+  ipCrossBranch.sort((a,b) => b.branchCount - a.branchCount || b.count - a.count);
+
+  return { bursts, issues, ipClusters, ipCrossBranch, ipDataPresent, flaggedIdx };
 }
 
 // ---- CSV fetch + column mapping ----
@@ -737,9 +757,11 @@ function aggregate(records){
   const n = records.length;
   if (n === 0) return null;
   const sum = (f) => records.reduce((a,r) => a + f(r), 0);
-  const sat = sum(r=>r.sat)/n;       // 1-5
+  // CSAT = % of responses that are "positive" — average of Happy, Respect, Speed >= 4 (top-2-box on the combined score)
+  const sat = sum(r=>(r.hp+r.rs+r.sp)/3)/n;   // 1-5, avg shown as the "avg X/5" sub-label
+  const satPositive = records.filter(r => (r.hp+r.rs+r.sp)/3 >= 4).length;
+  const satPct = n ? satPositive/n*100 : 0;
   const trust = sum(r=>r.tr)/n;      // 1-5
-  const satPct = (sat - 1) / 4 * 100;
   const trustPct = (trust - 1) / 4 * 100;
   const topbox = sum(r=>r.tb)/n * 100;
   const promoters = records.filter(r=>r.nc==='P').length;
@@ -860,7 +882,7 @@ const BREAKDOWN_COLOR = '#123C6B';
 const kpiDonutCharts = {};
 // ============ Metric definitions (breakup text shown on the CSAT / Trust cards) ============
 const METRIC_BREAKUP = {
-  csat: 'CSAT — average of Happy, Respect, Speed and Visit-Again scores, converted from a 1–5 scale to a 0–100% index.',
+  csat: 'CSAT — % of responses where the average of Happy, Respect and Speed is 4 or higher.',
   trust: 'Trust Score — average of Respect and Visit-Again scores, converted to a 0–100% index.'
 };
 
@@ -1438,8 +1460,9 @@ function renderAnomalies(){
   const bursts = ANOMALY.bursts.filter(b => brands.includes(b.brand) && (state.branch==='ALL' || b.branch===state.branch));
   const issues = ANOMALY.issues.filter(i => brands.includes(i.brand) && (state.branch==='ALL' || i.branch===state.branch));
   const ipClusters = (ANOMALY.ipClusters||[]).filter(c => brands.includes(c.brand) && (state.branch==='ALL' || c.branch===state.branch));
+  const ipCrossBranch = (ANOMALY.ipCrossBranch||[]).filter(c => brands.includes(c.brand) && (state.branch==='ALL' || c.branches.split(', ').includes(state.branch)));
   const totalN = RECORDS.filter(r => brands.includes(r.br) && (state.branch==='ALL' || r.bh===state.branch)).length;
-  const flaggedRows = bursts.reduce((a,b)=>a+b.count,0) + issues.length + ipClusters.reduce((a,c)=>a+c.count,0);
+  const flaggedRows = bursts.reduce((a,b)=>a+b.count,0) + issues.length + ipClusters.reduce((a,c)=>a+c.count,0) + ipCrossBranch.reduce((a,c)=>a+c.count,0);
 
   document.getElementById('anomalyFlags').innerHTML = `
     <div class="anomaly-flag"><div class="n">${flaggedRows}</div><div class="l">Flagged responses</div></div>
@@ -1447,6 +1470,7 @@ function renderAnomalies(){
     <div class="anomaly-flag"><div class="n">${bursts.length}</div><div class="l">Repeat-submission clusters</div></div>
     <div class="anomaly-flag"><div class="n">${issues.length}</div><div class="l">Identity integrity issues</div></div>
     <div class="anomaly-flag"><div class="n">${ipClusters.length}</div><div class="l">Repeat IP clusters</div></div>
+    <div class="anomaly-flag"><div class="n">${ipCrossBranch.length}</div><div class="l">Cross-branch IP clusters</div></div>
   `;
 
   const byBranchCount = {};
@@ -1498,6 +1522,22 @@ function renderAnomalies(){
         <td class="num">${c.count}</td>
         <td class="num">${c.first} → ${c.last}</td>
       </tr>`).join('') : '<tr><td colspan="5" class="empty-state">No repeat-IP clusters in this filter.</td></tr>';
+  }
+
+  const ipCrossBody = document.getElementById('ipCrossBranchTableBody');
+  if (!ANOMALY.ipDataPresent){
+    ipCrossBody.innerHTML = '<tr><td colspan="6" class="empty-state">No IP Address column found in the current data source — nothing to check.</td></tr>';
+  } else {
+    const sortedCross = ipCrossBranch.slice().sort((a,b)=> b.branchCount-a.branchCount || b.count-a.count);
+    ipCrossBody.innerHTML = sortedCross.length ? sortedCross.map(c => `
+      <tr>
+        <td><span class="brand-chip ${c.brand==='Al Ansari'?'ansari':'bec'}">${c.brand==='Al Ansari'?'Ansari':'BEC'}</span></td>
+        <td class="num">${c.ip_masked}</td>
+        <td><span class="sev-dot"></span>${c.branches}</td>
+        <td class="num">${c.branchCount}</td>
+        <td class="num">${c.count}</td>
+        <td class="num">${c.first} → ${c.last}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty-state">No cross-branch IP clusters in this filter.</td></tr>';
   }
 }
 
@@ -1607,30 +1647,6 @@ function renderCommentSentimentSummary(){
       <span><span class="dot" style="background:var(--detractor)"></span>Negative</span>
     </div>`;
 }
-function renderCommentFeed(){
-  const search = (document.getElementById('commentSearch').value || '').toLowerCase();
-  let recs = filteredRecords().filter(r => r.c);
-  if (commentFilter !== 'ALL') recs = recs.filter(r => r.nc === commentFilter);
-  if (search) recs = recs.filter(r => r.c.toLowerCase().includes(search));
-  recs = recs.slice().reverse().slice(0, 250);
-
-  document.getElementById('commentCount').textContent = `${recs.length} shown`;
-  const feed = document.getElementById('commentFeed');
-  if (recs.length === 0){ feed.innerHTML = '<div class="empty-state">No comments match.</div>'; return; }
-  feed.innerHTML = recs.map(r => {
-    const s = scoreCommentSentiment(r.c);
-    const sLabel = sentimentLabel(s);
-    return `
-    <div class="comment">
-      <div class="comment-meta">
-        <span class="score-dot" style="background:${CAT_COLOR[r.nc]}"></span>
-        <span>${r.bh}</span><span>·</span><span>${r.br}</span><span>·</span><span>${CAT_LABEL[r.nc]}</span>
-        <span class="sentiment-chip" style="color:${sentimentColorVar(s)};border-color:${sentimentColorVar(s)};">${sLabel}</span>
-      </div>
-      <div class="comment-text">${escapeHtml(r.c)}</div>
-    </div>
-  `;}).join('');
-}
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 // ============ Negative sentiment list (company-wise views only) ============
@@ -1686,7 +1702,6 @@ function renderAll(){
   renderNegativeSentimentList();
   renderAnomalies();
   renderCommentSentimentSummary();
-  renderCommentFeed();
 }
 
 function populateBranchFilter(){
@@ -1729,15 +1744,6 @@ if (!window.__dashboardListenersAttached){
   });
 
   document.getElementById('branchSearch').addEventListener('input', renderBranchTable);
-  document.getElementById('commentSearch').addEventListener('input', renderCommentFeed);
-
-  document.getElementById('commentFilterRow').addEventListener('click', e => {
-    const btn = e.target.closest('.chip-btn'); if (!btn) return;
-    document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    commentFilter = btn.dataset.f;
-    renderCommentFeed();
-  });
 
   document.querySelector('thead').addEventListener('click', e => {
     const th = e.target.closest('th'); if (!th) return;
@@ -1751,9 +1757,7 @@ if (!window.__dashboardListenersAttached){
   document.getElementById('resetFilters').addEventListener('click', () => {
     state.brand = 'ALL'; state.branch = 'ALL'; state.focusMetric = null; state.focusMetric2 = null; state.excludeAnomalies = false;
     document.querySelectorAll('#brandToggle button').forEach(b => b.classList.toggle('active', b.dataset.brand==='ALL'));
-    document.getElementById('branchSearch').value=''; document.getElementById('commentSearch').value='';
-    commentFilter='ALL';
-    document.querySelectorAll('#commentFilterRow .chip-btn').forEach(b=>b.classList.toggle('active', b.dataset.f==='ALL'));
+    document.getElementById('branchSearch').value='';
     populateBranchFilter();
     renderAll();
   });
